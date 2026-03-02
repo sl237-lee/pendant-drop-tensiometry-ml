@@ -262,7 +262,7 @@ PENDANT DROP NEURAL NETWORK TRAINING
 
 ---
 
-## 🔬 How It Works
+## How It Works
 
 ### Complete Pipeline
 ```
