@@ -729,7 +729,7 @@ This project is for academic use. Please cite the original paper if using this m
 
 **Andrew Lee**  
 Math 451 - Machine Learning in Physics  
-[Your Email]
+srlee02099@gmail.com
 
 ---
 
