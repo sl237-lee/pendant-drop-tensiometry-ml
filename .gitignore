@@ -1,0 +1,32 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Data files (too large)
+data/synthetic/
+*.pkl
+*.h5
+
+# MacOS
+.DS_Store
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Results (optional - you might want to commit these)
+# results/
+
+# Models (optional - might be too large)
+models/*.h5
