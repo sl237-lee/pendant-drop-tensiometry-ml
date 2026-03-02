@@ -109,7 +109,7 @@ python -c "import cv2; print('✅ OpenCV:', cv2.__version__)"
 
 ---
 
-## 🎓 Usage Guide
+## Usage Guide
 
 ### 1. Test Pre-trained Model
 
@@ -318,8 +318,6 @@ where:
   κ_φ = azimuthal curvature
 ```
 
-**Forward Problem (Easy):** Given γ → compute droplet shape  
-**Inverse Problem (Hard):** Given shape → compute γ ← **Our ML solution!**
 
 ### Neural Network Architecture
 ```python
