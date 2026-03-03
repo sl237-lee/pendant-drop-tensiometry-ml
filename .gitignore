@@ -30,3 +30,7 @@ data/synthetic/
 
 # Models (optional - might be too large)
 models/*.h5
+
+# Gradio temp files
+temp_upload.png
+flagged/
