@@ -456,3 +456,40 @@ python scripts/generate_dataset.py --shape_class 3
 ---
 
 
+
+---
+
+## 🌐 Web Interface
+
+### Try it Live!
+
+A drag-and-drop web interface is available for easy predictions:
+```bash
+# Install Gradio
+pip install gradio
+
+# Launch web app
+python app.py
+```
+
+This will:
+- Start a local server at `http://127.0.0.1:7860`
+- Generate a **public shareable link** (valid for 72 hours)
+- Open automatically in your browser
+
+### Features:
+- 📤 Drag-and-drop image upload
+- ⚙️ Adjustable calibration settings
+- 📊 Visual results with detected edges
+- 🚀 Instant predictions (<1 second)
+- 📱 Mobile-friendly interface
+
+### Deploy Permanently (Free):
+
+Deploy to Hugging Face Spaces for permanent hosting:
+```bash
+gradio deploy
+```
+
+Your app will be live at: `https://huggingface.co/spaces/YOUR_USERNAME/neural-tensiometry`
+
