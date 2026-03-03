@@ -202,7 +202,7 @@ with gr.Blocks(title="Neural Tensiometry") as demo:
     - [Project Summary](https://github.com/sl237-lee/pendant-drop-tensiometry-ml/blob/main/PROJECT_SUMMARY.md)
     
     ---
-    **Built by Seungryul Andrew Lee | Math 451 - Machine Learning in Physics**
+    **Built by Seungryul Andrew Lee | Machine Learning in Physics**
     """)
     
     predict_btn.click(
