@@ -459,9 +459,8 @@ python scripts/generate_dataset.py --shape_class 3
 
 ---
 
-## 🌐 Web Interface
+## Web Interface
 
-### Try it Live!
 
 A drag-and-drop web interface is available for easy predictions:
 ```bash
@@ -478,11 +477,11 @@ This will:
 - Open automatically in your browser
 
 ### Features:
-- 📤 Drag-and-drop image upload
-- ⚙️ Adjustable calibration settings
-- 📊 Visual results with detected edges
-- 🚀 Instant predictions (<1 second)
-- 📱 Mobile-friendly interface
+- Drag-and-drop image upload
+- Adjustable calibration settings
+- Visual results with detected edges
+- Instant predictions (<1 second)
+- Mobile-friendly interface
 
 ### Deploy Permanently (Free):
 
