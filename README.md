@@ -483,12 +483,4 @@ This will:
 - Instant predictions (<1 second)
 - Mobile-friendly interface
 
-### Deploy Permanently (Free):
-
-Deploy to Hugging Face Spaces for permanent hosting:
-```bash
-gradio deploy
-```
-
-Your app will be live at: `https://huggingface.co/spaces/YOUR_USERNAME/neural-tensiometry`
 
