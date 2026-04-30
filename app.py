@@ -6,6 +6,7 @@ import h5py
 import json
 from tensorflow import keras
 from src.preprocessing.edge_detection import DropletImageProcessor
+from src.utils.lab_presets import resolve_lab_parameters
 import numpy as np
 import matplotlib.pyplot as plt
 from io import BytesIO
@@ -40,20 +41,33 @@ print("✅ Model loaded!")
 def predict_surface_tension(image, pixel_to_mm, capillary_mm, density):
     """Predict surface tension from uploaded image"""
     try:
-        # Save uploaded image temporarily
-        temp_path = "temp_upload.png"
-        image.save(temp_path)
+        if isinstance(image, str):
+            image_path = image
+        else:
+            # Save uploaded image temporarily if Gradio provided a PIL image.
+            temp_path = "temp_upload.png"
+            image.save(temp_path)
+            image_path = temp_path
 
-        # Process image
-        r, z, contour, img_prep = processor.process_image(temp_path, pixel_to_mm)
+        params = resolve_lab_parameters(image_path, pixel_to_mm, capillary_mm, density)
+        pixel_to_mm = params["pixel_to_mm"]
+        capillary_mm = params["capillary_mm"]
+        density = params["density"]
+        preset = params["preset"]
 
-        if r is None or len(r) == 0:
+        # Process image in raw pixel space.
+        # Calibration is applied once below so we do not double-scale the shape.
+        r_pixels, z_pixels, contour, img_prep = processor.process_image(image_path)
+
+        if r_pixels is None or len(r_pixels) == 0:
             return "❌ **Error:** Could not detect droplet edge. Please check image quality.", None
 
         # Normalize coordinates
         a = capillary_mm
-        r_norm = (r * pixel_to_mm) / a
-        z_norm = (z * pixel_to_mm) / a
+        r_mm = r_pixels * pixel_to_mm
+        z_mm = z_pixels * pixel_to_mm
+        r_norm = r_mm / a
+        z_norm = z_mm / a
 
         # Prepare for model
         coords = np.column_stack([r_norm, z_norm])
@@ -107,28 +121,35 @@ def predict_surface_tension(image, pixel_to_mm, capillary_mm, density):
         plt.close()
 
         # Format results
-        results_text = f"""
-# Prediction Results
+        results_lines = [
+            "# Prediction Results",
+            "",
+            "## Predicted Parameters:",
+            f"- **Bond Number (Bo):** {Bo:.4f}",
+            f"- **Apex Pressure (p̃_L):** {pL:.4f}",
+            "",
+            "## Physical Properties:",
+            f"- **Surface Tension:** **{gamma_mN:.2f} mN/m**",
+            f"- **Capillary Diameter:** {capillary_mm:.2f} mm",
+            f"- **Density Difference:** {density:.0f} kg/m³",
+            "",
+            "## Processing Info:",
+            f"- **Edge Points Extracted:** {len(r_pixels)} points",
+            f"- **Calibration:** {pixel_to_mm:.4f} mm/pixel",
+        ]
+        if preset is not None:
+            results_lines.append(f"- **Preset:** {preset['label']} ({preset['key']})")
 
-## Predicted Parameters:
-- **Bond Number (Bo):** {Bo:.4f}
-- **Apex Pressure (p̃_L):** {pL:.4f}
+        results_lines += [
+            "",
+            "---",
+            "### Reference Values:",
+            "- Water at 20°C: γ ≈ 72 mN/m",
+            "- Ethanol at 20°C: γ ≈ 22 mN/m",
+            "- Mercury at 20°C: γ ≈ 486 mN/m",
+        ]
 
-## Physical Properties:
-- **Surface Tension:** **{gamma_mN:.2f} mN/m**
-- **Capillary Diameter:** {capillary_mm:.2f} mm
-- **Density Difference:** {density:.0f} kg/m³
-
-## Processing Info:
-- **Edge Points Extracted:** {len(r)} points
-- **Calibration:** {pixel_to_mm:.4f} mm/pixel
-
----
-### Reference Values:
-- Water at 20°C: γ ≈ 72 mN/m
-- Ethanol at 20°C: γ ≈ 22 mN/m
-- Mercury at 20°C: γ ≈ 486 mN/m
-        """
+        results_text = "\n".join(results_lines)
 
         return results_text, result_image
 
@@ -175,18 +196,18 @@ with gr.Blocks(title="Neural Tensiometry") as demo:
 
     with gr.Row():
         with gr.Column(scale=1):
-            image_input = gr.Image(type="pil", label="📷 Upload Droplet Image")
+            image_input = gr.Image(type="filepath", label="📷 Upload Droplet Image")
 
             with gr.Accordion("⚙️ Calibration Settings", open=True):
                 pixel_to_mm = gr.Number(
-                    value=0.05,
+                    value=0.045,
                     label="Pixel to mm ratio",
                     info="How many mm per pixel? (measure something with known size)"
                 )
                 capillary_mm = gr.Number(
-                    value=2.7,
+                    value=1.8,
                     label="Capillary diameter (mm)",
-                    info="Diameter of the capillary tube"
+                    info="Use the outer diameter of the capillary tube"
                 )
                 density = gr.Number(
                     value=1000,
@@ -198,7 +219,7 @@ with gr.Blocks(title="Neural Tensiometry") as demo:
 
             gr.Markdown("""
             ### 💡 Quick Tips:
-            - Default values work for most water droplets
+            - Lab filename presets will auto-fill the calibration values when available
             - Adjust `pixel_to_mm` if results seem off
             - Try the test image: `data/test_droplet_image.png`
             """)

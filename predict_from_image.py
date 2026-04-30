@@ -8,8 +8,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tensorflow import keras
 from pathlib import Path
+import tempfile
 
 from src.preprocessing.edge_detection import DropletImageProcessor
+from src.utils.lab_presets import resolve_lab_parameters
 
 
 def prepare_image_data(r_vals, z_vals, n_points=226):
@@ -26,7 +28,7 @@ def prepare_image_data(r_vals, z_vals, n_points=226):
 
 
 def predict_surface_tension_from_image(image_path, pixel_to_mm=1.0, 
-                                       capillary_diameter_mm=2.7,
+                                       capillary_diameter_mm=1.8,
                                        density_diff=1000.0):
     """
     Complete pipeline: Image → Surface Tension
@@ -44,6 +46,13 @@ def predict_surface_tension_from_image(image_path, pixel_to_mm=1.0,
     # Step 2: Process image
     print(f"\n2. Processing image: {image_path}")
     processor = DropletImageProcessor()
+
+    params = resolve_lab_parameters(image_path, pixel_to_mm, capillary_diameter_mm, density_diff)
+    pixel_to_mm = params["pixel_to_mm"]
+    capillary_diameter_mm = params["capillary_mm"]
+    density_diff = params["density"]
+    if params["preset"] is not None:
+        print(f"   Using preset: {params['preset']['label']} ({params['preset']['key']})")
     
     try:
         r_pixels, z_pixels, contour, img_prep = processor.process_image(image_path)
@@ -121,8 +130,9 @@ def predict_surface_tension_from_image(image_path, pixel_to_mm=1.0,
     axes[2].set_title('Prediction Results', fontsize=14, weight='bold')
     
     plt.tight_layout()
-    plt.savefig('results/image_prediction.png', dpi=150, bbox_inches='tight')
-    print("\n   ✅ Saved visualization to: results/image_prediction.png")
+    output_path = Path(tempfile.gettempdir()) / 'image_prediction.png'
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    print(f"\n   ✅ Saved visualization to: {output_path}")
     
     print("\n" + "="*70)
     print("PREDICTION COMPLETE!")
@@ -141,11 +151,11 @@ def predict_surface_tension_from_image(image_path, pixel_to_mm=1.0,
 
 if __name__ == '__main__':
     import argparse
-    
+
     parser = argparse.ArgumentParser()
     parser.add_argument('image', type=str)
-    parser.add_argument('--pixel_to_mm', type=float, default=0.05)
-    parser.add_argument('--capillary_mm', type=float, default=2.7)
+    parser.add_argument('--pixel_to_mm', type=float, default=0.045)
+    parser.add_argument('--capillary_mm', type=float, default=1.8)
     parser.add_argument('--density', type=float, default=1000.0)
     
     args = parser.parse_args()

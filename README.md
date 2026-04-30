@@ -147,17 +147,19 @@ python predict_from_image.py <IMAGE_PATH> [OPTIONS]
 - `IMAGE_PATH`: Path to droplet image (.jpg, .png)
 
 **Optional arguments:**
-- `--pixel_to_mm`: Calibration factor (default: 0.05)
-- `--capillary_mm`: Capillary diameter in mm (default: 2.7)
+- `--pixel_to_mm`: Calibration factor in mm/pixel (default: 0.045)
+- `--capillary_mm`: Effective outer capillary diameter in mm (default: 1.8)
 - `--density`: Density difference in kg/m³ (default: 1000)
 
 **Example:**
 ```bash
 python predict_from_image.py my_droplet.jpg \
-  --pixel_to_mm 0.048 \
-  --capillary_mm 3.0 \
+  --pixel_to_mm 0.045 \
+  --capillary_mm 1.8 \
   --density 1000
 ```
+
+For the lab images used in this project, the app can also auto-apply filename-based presets when the uploaded file name matches a known sample such as `water.JPG`, `pink_sugar.JPG`, or `salt_dark_green.JPG`.
 
 **Output:**
 ```
@@ -482,5 +484,4 @@ This will:
 - Visual results with detected edges
 - Instant predictions (<1 second)
 - Mobile-friendly interface
-
 

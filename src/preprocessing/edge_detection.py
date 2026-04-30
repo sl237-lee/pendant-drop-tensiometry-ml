@@ -13,12 +13,22 @@ class DropletImageProcessor:
     def __init__(self):
         self.canny_low = 30
         self.canny_high = 100
+        self.default_top_crop_fraction = 0.20
 
-    def preprocess_image(self, image_path):
-        """Load and preprocess image"""
+    def preprocess_image(self, image_path, top_crop_fraction=None):
+        """Load and preprocess image.
+
+        A small top crop helps remove the capillary stem above the pendant drop.
+        """
         img = cv2.imread(str(image_path))
         if img is None:
             raise ValueError(f"Could not load image: {image_path}")
+
+        crop_fraction = self.default_top_crop_fraction if top_crop_fraction is None else top_crop_fraction
+        crop_fraction = float(np.clip(crop_fraction, 0.0, 0.5))
+        if crop_fraction > 0:
+            crop_y = int(img.shape[0] * crop_fraction)
+            img = img[crop_y:, :]
 
         # Convert to grayscale
         if len(img.shape) == 3:
@@ -106,70 +116,85 @@ class DropletImageProcessor:
 
         return best_contour
 
-    def contour_to_coordinates(self, contour, pixel_to_mm=1.0):
+    def contour_to_coordinates(self, contour, pixel_to_mm=1.0, n_points=226):
         """
         Convert contour to (r, z) coordinates.
         Apex is at z=0, z increases downward (physical pendant drop convention).
         """
         points = contour.reshape(-1, 2)
 
-        # Find the droplet center x using the contour centroid (more robust than apex x)
-        M = cv2.moments(contour)
-        if M['m00'] != 0:
-            center_x = int(M['m10'] / M['m00'])
-        else:
-            center_x = int(np.mean(points[:, 0]))
+        # Reconstruct a single-valued radial profile by taking the left/right
+        # boundary at each image row. This is much more stable than sampling an
+        # arbitrary side of the contour.
+        row_map = {}
+        for x, y in points:
+            row_map.setdefault(int(y), []).append(int(x))
 
-        # Find apex: topmost point (minimum y in image coordinates)
-        # Use top 5% of points to find a stable apex x position
-        top_threshold = np.percentile(points[:, 1], 5)
-        top_points = points[points[:, 1] <= top_threshold]
-        apex_y = int(np.min(points[:, 1]))
-        apex_x = int(np.mean(top_points[:, 0]))  # average x of topmost points
-        apex = np.array([apex_x, apex_y])
+        rows = []
+        for y in sorted(row_map):
+            xs = np.asarray(row_map[y])
+            if xs.size < 2:
+                continue
+            rows.append((y, xs.min(), xs.max()))
 
-        # Use right side of droplet only (x >= center_x)
-        right_side = points[points[:, 0] >= center_x]
+        if len(rows) < 5:
+            # Fallback to the previous right-side extraction if the contour is sparse.
+            M = cv2.moments(contour)
+            if M['m00'] != 0:
+                center_x = int(M['m10'] / M['m00'])
+            else:
+                center_x = int(np.mean(points[:, 0]))
+            right_side = points[points[:, 0] >= center_x]
+            if len(right_side) < 10:
+                right_side = points
+            apex_y = int(np.min(right_side[:, 1]))
+            r_vals = (right_side[:, 0] - center_x) * pixel_to_mm
+            z_vals = (right_side[:, 1] - apex_y) * pixel_to_mm
+            sort_idx = np.argsort(z_vals)
+            return r_vals[sort_idx], z_vals[sort_idx]
 
-        if len(right_side) < 10:
-            right_side = points
+        rows = np.asarray(rows, dtype=float)
+        z_pix = rows[:, 0]
+        r_pix = (rows[:, 2] - rows[:, 1]) / 2.0
 
-        # Convert to physical coordinates centered at apex
-        r_vals = (right_side[:, 0] - apex[0]) * pixel_to_mm
-        z_vals = (right_side[:, 1] - apex[1]) * pixel_to_mm  # positive = downward
+        # Smooth the radial profile to suppress edge speckle and glare.
+        if len(r_pix) >= 5:
+            kernel = np.ones(5, dtype=float) / 5.0
+            r_pix = np.convolve(r_pix, kernel, mode='same')
 
-        # Sort by z (top to bottom)
-        sort_idx = np.argsort(z_vals)
-        r_vals = r_vals[sort_idx]
-        z_vals = z_vals[sort_idx]
+        # Keep only the lower pendant profile, then sample it on a fixed grid
+        # so the model sees a consistent input length and ordering.
+        apex_y = z_pix[0]
+        z_vals = (z_pix - apex_y) * pixel_to_mm
+        r_vals = r_pix * pixel_to_mm
 
-        # Remove negative z points (above apex, part of capillary)
-        mask = z_vals >= 0
-        r_vals = r_vals[mask]
-        z_vals = z_vals[mask]
+        valid = z_vals >= 0
+        r_vals = r_vals[valid]
+        z_vals = z_vals[valid]
 
-        # Remove outlier r values (noise spikes)
-        if len(r_vals) > 10:
-            r_median = np.median(r_vals)
-            r_std = np.std(r_vals)
-            mask = np.abs(r_vals - r_median) < 3 * r_std
-            r_vals = r_vals[mask]
-            z_vals = z_vals[mask]
+        if len(r_vals) < 2:
+            return r_vals, z_vals
 
-        return r_vals, z_vals
+        # Resample onto a uniform z grid to better match the model's training
+        # distribution from synthetic ODE solutions.
+        z_grid = np.linspace(float(z_vals.min()), float(z_vals.max()), n_points)
+        r_grid = np.interp(z_grid, z_vals, r_vals)
 
-    def process_image(self, image_path, pixel_to_mm=1.0):
+        return r_grid, z_grid
+
+    def process_image(self, image_path, pixel_to_mm=1.0, top_crop_fraction=None):
         """
         Complete pipeline: image -> coordinates
 
         Args:
             image_path: Path to droplet image
             pixel_to_mm: Calibration factor (mm per pixel)
+            top_crop_fraction: Fraction of the image height to crop from the top
 
         Returns:
             r_vals, z_vals, contour, preprocessed_image
         """
-        img_prep = self.preprocess_image(image_path)
+        img_prep = self.preprocess_image(image_path, top_crop_fraction=top_crop_fraction)
         edges = self.detect_edges(img_prep)
         contour = self.extract_contour(edges, img_prep.shape)
         r, z = self.contour_to_coordinates(contour, pixel_to_mm)

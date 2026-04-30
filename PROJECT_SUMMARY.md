@@ -490,18 +490,18 @@ python test_trained_model.py
 ### Predict from Image
 ```bash
 # Predict surface tension from image
-python predict_from_image.py data/test_droplet_image.png --pixel_to_mm 0.0067 --capillary_mm 2.7
+python predict_from_image.py data/test_droplet_image.png --pixel_to_mm 0.045 --capillary_mm 1.8
 
 # With custom parameters
-python predict_from_image.py /path/to/image.jpg --pixel_to_mm 0.05 --capillary_mm 3.0 --density 1000
+python predict_from_image.py /path/to/image.jpg --pixel_to_mm 0.045 --capillary_mm 1.8 --density 1000
 
 # View result
 open results/image_prediction.png
 ```
 
 **Parameters:**
-- `--pixel_to_mm`: Calibration factor (mm per pixel)
-- `--capillary_mm`: Capillary diameter in millimeters
+- `--pixel_to_mm`: Calibration factor in mm/pixel
+- `--capillary_mm`: Effective outer capillary diameter in millimeters
 - `--density`: Density difference in kg/m³ (default: 1000 for water)
 
 ### Create Synthetic Test Image
