@@ -26,6 +26,13 @@ class DropletImageProcessor:
         else:
             gray = img
 
+        # Auto-detect low contrast images and apply stronger enhancement
+        contrast = gray.std()
+        if contrast < 40:
+            # Low contrast image (e.g. alcohol) — apply stronger CLAHE first
+            clahe_strong = cv2.createCLAHE(clipLimit=6.0, tileGridSize=(4, 4))
+            gray = clahe_strong.apply(gray)
+
         # Bilateral filter: smooths interior glare while keeping edges sharp
         filtered = cv2.bilateralFilter(gray, d=9, sigmaColor=75, sigmaSpace=75)
 
@@ -62,7 +69,6 @@ class DropletImageProcessor:
         if len(contours) == 0:
             raise ValueError("No contours found in image!")
 
-        # Score each contour: prefer large, not touching border, roughly droplet-shaped
         best_contour = None
         best_score = -1
 
@@ -82,7 +88,7 @@ class DropletImageProcessor:
 
             # Prefer contours in the lower 2/3 of the image (pendant drop hangs down)
             center_y = y + ch / 2
-            vertical_position_score = center_y / h  # higher = lower in image = better
+            vertical_position_score = center_y / h
 
             # Prefer taller contours (pendant drops are tall relative to width)
             aspect_score = ch / max(cw, 1)
@@ -107,15 +113,25 @@ class DropletImageProcessor:
         """
         points = contour.reshape(-1, 2)
 
-        # Find apex: topmost point (minimum y in image coordinates)
-        apex_idx = np.argmin(points[:, 1])
-        apex = points[apex_idx]
+        # Find the droplet center x using the contour centroid (more robust than apex x)
+        M = cv2.moments(contour)
+        if M['m00'] != 0:
+            center_x = int(M['m10'] / M['m00'])
+        else:
+            center_x = int(np.mean(points[:, 0]))
 
-        # Use right side of droplet only (r >= 0)
-        right_side = points[points[:, 0] >= apex[0]]
+        # Find apex: topmost point (minimum y in image coordinates)
+        # Use top 5% of points to find a stable apex x position
+        top_threshold = np.percentile(points[:, 1], 5)
+        top_points = points[points[:, 1] <= top_threshold]
+        apex_y = int(np.min(points[:, 1]))
+        apex_x = int(np.mean(top_points[:, 0]))  # average x of topmost points
+        apex = np.array([apex_x, apex_y])
+
+        # Use right side of droplet only (x >= center_x)
+        right_side = points[points[:, 0] >= center_x]
 
         if len(right_side) < 10:
-            # Fallback: use all points if right side filtering is too aggressive
             right_side = points
 
         # Convert to physical coordinates centered at apex
@@ -144,7 +160,7 @@ class DropletImageProcessor:
 
     def process_image(self, image_path, pixel_to_mm=1.0):
         """
-        Complete pipeline: image → coordinates
+        Complete pipeline: image -> coordinates
 
         Args:
             image_path: Path to droplet image
